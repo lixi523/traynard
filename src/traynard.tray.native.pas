@@ -33,7 +33,7 @@ unit Traynard.Tray.Native;
 interface
 
 uses
-  Classes, SysUtils, Graphics, Menus, Windows, JwaWinUser;
+  Classes, SysUtils, Graphics, Menus, Controls, Windows, JwaWinUser;
 
 type
 
@@ -415,11 +415,18 @@ begin
 end;
 
 procedure TNativeTrayIcon.DoContextMenu(const X, Y: Integer);
+var
+  Pt: TPoint;
 begin
   if FPopUpMenu = nil then Exit;
-  // Required so that the menu is dismissed when the user clicks elsewhere.
+  // Same approach as LCL's win32 tray: pop the menu at the current cursor
+  // position (LCL screen coordinates) and set the owner window foreground,
+  // then post WM_NULL. Without this the menu can render partially / mess up
+  // the Z-order when invoked from a notification icon.
+  Pt := Mouse.CursorPos;
   SetForegroundWindow(TrayNotifier.Window);
-  FPopUpMenu.Popup(X, Y);
+  PostMessage(TrayNotifier.Window, WM_NULL, 0, 0);
+  FPopUpMenu.Popup(Pt.X, Pt.Y);
 end;
 
 procedure TNativeTrayIcon.DoEvent(AEvent: Cardinal; X, Y: Integer);
