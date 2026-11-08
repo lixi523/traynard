@@ -1,3 +1,5 @@
+因为原版的软件托盘图标和被收入托盘的图标绑定在一起的，所以用AI改了一份各图标分离版的
+
 # ![Traynard](assets/logo.png) Traynard
 
 [[简体中文](docs/README.zh_CN.md)]
