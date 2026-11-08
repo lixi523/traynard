@@ -5,3 +5,4 @@
 *.mo
 out/
 .tmp_lcl/
+.loomy-attachments/
