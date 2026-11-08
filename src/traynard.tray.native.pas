@@ -174,7 +174,7 @@ type
     procedure EnsureWindow;
     function GetWindow: HWND;
     function FindByID(AID: UINT): TNativeTrayIcon;
-    procedure Dispatch(AID: UINT; AEvent: Cardinal; X, Y: Integer);
+    procedure HandleNotify(AID: UINT; AEvent: Cardinal; X, Y: Integer);
   public
     constructor Create;
     destructor Destroy; override;
@@ -265,7 +265,7 @@ begin
     Event := LOWORD16(PtrUInt(LParam));
     X := SmallInt(LOWORD16(PtrUInt(WParam)));
     Y := SmallInt(HIWORD16(PtrUInt(WParam)));
-    Notifier.Dispatch(ID, Event, X, Y);
+    Notifier.HandleNotify(ID, Event, X, Y);
     Exit(0);
   end;
 
@@ -460,7 +460,8 @@ begin
   WndClass.lpfnWndProc := @TrayWndProc;
   WndClass.hInstance := HInstance;
   WndClass.lpszClassName := TRAY_WINDOW_CLASS;
-  RegisterClassW(@WndClass);
+  { Qualify with Windows: JwaWinUser.RegisterClassW takes the struct by value. }
+  Windows.RegisterClassW(@WndClass);
 
   FWindow := CreateWindowExW(0, TRAY_WINDOW_CLASS, '', 0, 0, 0, 0, 0,
     0, 0, HInstance, Self);
@@ -498,7 +499,7 @@ begin
   end;
 end;
 
-procedure TTrayNotifier.Dispatch(AID: UINT; AEvent: Cardinal; X, Y: Integer);
+procedure TTrayNotifier.HandleNotify(AID: UINT; AEvent: Cardinal; X, Y: Integer);
 var
   Icon: TNativeTrayIcon;
 begin
