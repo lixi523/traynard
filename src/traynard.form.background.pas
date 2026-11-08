@@ -9,6 +9,7 @@ uses
   Traynard.Types,
   Traynard.Window,
   Traynard.Tray,
+  Traynard.Tray.Native,
   Traynard.Hotkey,
   Traynard.Notification;
 
@@ -42,7 +43,6 @@ type
     Separator4: TMenuItem;
     Separator5: TMenuItem;
     TrayMenu: TPopupMenu;
-    TrayIcon: TTrayIcon;
     UniqueInstance: TUniqueInstance;
     procedure ActionAutoMinimizeExecute(Sender: TObject);
     procedure ActionCloseExecute(Sender: TObject);
@@ -65,6 +65,7 @@ type
     procedure TrayManagerInstalled(const TrayManager: TTrayManager);
     procedure WindowManagerInstalled(const WindowManager: TWindowManager);
   private
+    FTrayIcon: TNativeTrayIcon;
     procedure SetLaunchMenuItems;
     procedure LaunchMenuItemClick(Sender: TObject);
   public
@@ -179,8 +180,14 @@ begin
   if UniqueInstance.PriorInstanceRunning then
     Exit;
 
-  TrayIcon.Hint := APP_NAME;
-  TrayIcon.Icon := Application.Icon;
+  { Native tray icon (own Shell_NotifyIcon registration with a unique GUID,
+    independent from the per-window / grouped icons created by TTrayManager). }
+  FTrayIcon := TNativeTrayIcon.Create(Self);
+  FTrayIcon.Hint := APP_NAME;
+  FTrayIcon.Icon.Assign(Application.Icon);
+  FTrayIcon.PopUpMenu := TrayMenu;
+  FTrayIcon.OnDblClick := @TrayIconDblClick;
+  FTrayIcon.Visible := True;
   PopupMenu := TrayMenu;
   try
     Settings.Load;
@@ -298,13 +305,7 @@ end;
 
 procedure TFormBackground.Notify(const Title, Message: string; const Timeout: Integer);
 begin
-  with TrayIcon do
-  begin
-    BalloonTitle := Title;
-    BalloonHint := Message;
-    if Timeout > 0 then BalloonTimeout := Timeout;
-    ShowBalloonHint;
-  end;
+  FTrayIcon.ShowBalloonHint(Title, Message, Timeout);
 end;
 
 end.

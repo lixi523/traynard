@@ -17,13 +17,6 @@ object FormBackground: TFormBackground
     Left = 56
     Top = 64
   end
-  object TrayIcon: TTrayIcon
-    PopUpMenu = TrayMenu
-    Visible = True
-    OnDblClick = TrayIconDblClick
-    Left = 56
-    Top = 120
-  end
   object ActionList: TActionList
     Left = 56
     Top = 176

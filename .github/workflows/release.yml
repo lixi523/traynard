@@ -78,7 +78,7 @@ jobs:
           @"
           Traynard is a Windows desktop utility for minimizing any application window to the system tray, A.K.A. "notification area".
 
-          Homepage: https://github.com/tabris17/traynard
+          Homepage: https://github.com/lixi523/traynard
 
           Usage:
 
@@ -158,9 +158,9 @@ jobs:
           {
               "version": "${{ needs.build.outputs.VERSION }}",
               "description": "A Windows desktop utility for minimizing any application window to the system tray",
-              "homepage": "https://github.com/tabris17/traynard",
+              "homepage": "https://github.com/lixi523/traynard",
               "license": "MIT",
-              "url": "https://github.com/tabris17/traynard/releases/latest/download/traynard-portable.zip",
+              "url": "https://github.com/lixi523/traynard/releases/latest/download/traynard-portable.zip",
               "hash": "${HASH}",
               "extract_dir": "traynard",
               "bin": "traynard.exe",
@@ -170,7 +170,7 @@ jobs:
               "persist": ["data"],
               "checkver": "github",
               "autoupdate": {
-                  "url": "https://github.com/tabris17/traynard/releases/download/v\$version/traynard-portable.zip"
+                  "url": "https://github.com/lixi523/traynard/releases/download/v\$version/traynard-portable.zip"
               }
           }
           EOF
@@ -190,5 +190,5 @@ jobs:
             ## Changelog
           files: |
             dist/*
-          draft: true
+          draft: false
           prerelease: false

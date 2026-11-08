@@ -33,7 +33,7 @@
       <AutoIncrementBuild Value="True"/>
       <MajorVersionNr Value="1"/>
       <MinorVersionNr Value="4"/>
-      <RevisionNr Value="1"/>
+      <RevisionNr Value="2"/>
       <StringTable FileDescription="Minimize any window to system tray"/>
     </VersionInfo>
     <BuildModes>
@@ -322,6 +322,11 @@
         <Filename Value="traynard.tray.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="Traynard.Tray"/>
+      </Unit>
+      <Unit>
+        <Filename Value="traynard.tray.native.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Traynard.Tray.Native"/>
       </Unit>
       <Unit>
         <Filename Value="traynard.storage.pas"/>

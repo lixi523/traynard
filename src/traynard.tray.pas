@@ -6,13 +6,13 @@ interface
 
 uses
   Classes, SysUtils, Menus, ExtCtrls, Generics.Collections, Windows,
-  Traynard.Window;
+  Traynard.Window, Traynard.Tray.Native;
 
 type
 
   { TTrayIconEx }
 
-  TTrayIconEx = class(TTrayIcon)
+  TTrayIconEx = class(TNativeTrayIcon)
   private
     procedure TrayIconClick(Sender: TObject);
   public
@@ -29,6 +29,8 @@ type
     procedure TrayIconClick(Sender: TObject);
     procedure RestoreWindowMenuItemClick(Sender: TObject);
     procedure RestoreGroupMenuItemClick(Sender: TObject);
+  protected
+    function MakeGuid: TGUID; override;
   public
     constructor Create(TheOwner: TComponent); override;
     procedure AddWindow(const Window: TWindow);
@@ -179,6 +181,12 @@ begin
   FRestoreGroupMenuItem.OnClick := @RestoreGroupMenuItemClick;
   FPopUpMenu.Items.Add(FRestoreGroupMenuItem);
   FPopUpMenu.Items.AddSeparator;
+end;
+
+function TGroupedTrayIcon.MakeGuid: TGUID;
+begin
+  { Unique GUID per application group (keyed by the executable path). }
+  Result := GuidFromString('Traynard/TrayGroup/' + FName);
 end;
 
 procedure TGroupedTrayIcon.AddWindow(const Window: TWindow);
