@@ -141,6 +141,7 @@ type
     procedure SendModify(AFlags: UINT);
     procedure AddToTray;
     procedure RemoveFromTray;
+    function ShowContextMenu: Boolean;
   protected
     function MakeGuid: TGUID; virtual;
     function GetGuid: TGUID;
@@ -192,6 +193,33 @@ implementation
 var
   GTaskbarCreated: UINT = 0;
 
+const
+  TRAY_MF_STRING         = $00000000;
+  TRAY_MF_GRAYED         = $00000001;
+  TRAY_MF_CHECKED        = $00000008;
+  TRAY_MF_POPUP          = $00000010;
+  TRAY_MF_SEPARATOR      = $00000800;
+  TRAY_MF_DEFAULT        = $00001000;
+  TRAY_TPM_LEFTALIGN     = $0000;
+  TRAY_TPM_RIGHTBUTTON   = $0002;
+  TRAY_TPM_RETURNCMD     = $0100;
+
+{ Distinct Pascal names + explicit import so they never clash with the
+  Windows / JwaWinUser units, and so the signatures stay exactly as we use
+  them. Used to show a plain (non owner-drawn) context menu. }
+function TrayCreatePopupMenu: HMENU;
+  stdcall; external 'user32' name 'CreatePopupMenu';
+function TrayDestroyMenu(Menu: HMENU): BOOL;
+  stdcall; external 'user32' name 'DestroyMenu';
+function TrayAppendMenuW(Menu: HMENU; Flags: UINT; NewItem: PtrUInt;
+  NewItemStr: PWideChar): BOOL;
+  stdcall; external 'user32' name 'AppendMenuW';
+function TrayGetMenuItemCount(Menu: HMENU): Integer;
+  stdcall; external 'user32' name 'GetMenuItemCount';
+function TrayTrackPopupMenuEx(Menu: HMENU; Flags: UINT; X, Y: Integer;
+  Wnd: HWND; Params: Pointer): DWORD;
+  stdcall; external 'user32' name 'TrackPopupMenuEx';
+
 function HIWORD16(const Value: PtrUInt): Word; inline;
 begin
   Result := Word((Value shr 16) and $FFFF);
@@ -232,6 +260,100 @@ begin
   B[6] := (B[6] and $0F) or $40;    // version 4
   B[8] := (B[8] and $3F) or $80;    // variant
   Move(B[0], Result, SizeOf(Result));
+end;
+
+{ Build a plain (non owner-drawn) native menu from the LCL menu item tree.
+  Leaf items are collected in AItems; their command id is (index + 1). }
+procedure AppendItemsToNativeMenu(AMenu: HMENU; const Root: TMenuItem;
+  AItems: TList; AIgnoreVisible: Boolean);
+var
+  I: Integer;
+  Item: TMenuItem;
+  SubMenu: HMENU;
+  Caption: UnicodeString;
+  Flags: UINT;
+begin
+  for I := 0 to Root.Count - 1 do
+  begin
+    Item := Root[I];
+    if Item = nil then Continue;
+    if (not AIgnoreVisible) and (not Item.Visible) then Continue;
+    if Item.IsLine then
+    begin
+      TrayAppendMenuW(AMenu, TRAY_MF_SEPARATOR, 0, nil);
+      Continue;
+    end;
+
+    Flags := TRAY_MF_STRING;
+    if not Item.Enabled then Flags := Flags or TRAY_MF_GRAYED;
+    if Item.Checked then Flags := Flags or TRAY_MF_CHECKED;
+    if Item.Default then Flags := Flags or TRAY_MF_DEFAULT;
+    Caption := UTF8Decode(Item.Caption);
+
+    if Item.Count > 0 then
+    begin
+      SubMenu := TrayCreatePopupMenu;
+      AppendItemsToNativeMenu(SubMenu, Item, AItems, AIgnoreVisible);
+      TrayAppendMenuW(AMenu, Flags or TRAY_MF_POPUP, PtrUInt(SubMenu),
+        PWideChar(Caption));
+    end
+    else
+    begin
+      AItems.Add(Pointer(Item));
+      TrayAppendMenuW(AMenu, Flags, PtrUInt(AItems.Count), PWideChar(Caption));
+    end;
+  end;
+end;
+
+function TNativeTrayIcon.ShowContextMenu: Boolean;
+var
+  Menu: HMENU;
+  Items: TList;
+  Pt: TPoint;
+  Cmd: DWORD;
+  Item: TMenuItem;
+begin
+  Result := False;
+  if FPopUpMenu = nil then Exit;
+
+  // Let the owner update item states (Enabled/Checked/visibility, submenu
+  // contents) before we read them.
+  if Assigned(FPopUpMenu.OnPopup) then FPopUpMenu.OnPopup(FPopUpMenu);
+
+  Items := TList.Create;
+  Menu := 0;
+  try
+    Menu := TrayCreatePopupMenu;
+    AppendItemsToNativeMenu(Menu, FPopUpMenu.Items, Items, False);
+    if TrayGetMenuItemCount(Menu) <= 0 then
+    begin
+      { Defensive fallback: if everything came out hidden, show the items
+        anyway instead of an empty shell. }
+      TrayDestroyMenu(Menu);
+      Items.Clear;
+      Menu := TrayCreatePopupMenu;
+      AppendItemsToNativeMenu(Menu, FPopUpMenu.Items, Items, True);
+    end;
+    if TrayGetMenuItemCount(Menu) <= 0 then Exit;
+
+    Pt := Mouse.CursorPos;
+    SetForegroundWindow(TrayNotifier.Window);
+    PostMessage(TrayNotifier.Window, WM_NULL, 0, 0);
+
+    Cmd := TrayTrackPopupMenuEx(Menu,
+      TRAY_TPM_RETURNCMD or TRAY_TPM_RIGHTBUTTON or TRAY_TPM_LEFTALIGN,
+      Pt.X, Pt.Y, TrayNotifier.Window, nil);
+
+    if (Cmd > 0) and (Cmd <= DWORD(Items.Count)) then
+    begin
+      Item := TMenuItem(Items[Integer(Cmd) - 1]);
+      if Assigned(Item) and Item.Enabled then Item.Click;
+    end;
+    Result := True;
+  finally
+    if Menu <> 0 then TrayDestroyMenu(Menu);
+    Items.Free;
+  end;
 end;
 
 { message window procedure }
@@ -415,18 +537,8 @@ begin
 end;
 
 procedure TNativeTrayIcon.DoContextMenu(const X, Y: Integer);
-var
-  Pt: TPoint;
 begin
-  if FPopUpMenu = nil then Exit;
-  // Same approach as LCL's win32 tray: pop the menu at the current cursor
-  // position (LCL screen coordinates) and set the owner window foreground,
-  // then post WM_NULL. Without this the menu can render partially / mess up
-  // the Z-order when invoked from a notification icon.
-  Pt := Mouse.CursorPos;
-  SetForegroundWindow(TrayNotifier.Window);
-  PostMessage(TrayNotifier.Window, WM_NULL, 0, 0);
-  FPopUpMenu.Popup(Pt.X, Pt.Y);
+  ShowContextMenu;
 end;
 
 procedure TNativeTrayIcon.DoEvent(AEvent: Cardinal; X, Y: Integer);
